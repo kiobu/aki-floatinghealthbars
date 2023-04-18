@@ -40,6 +40,8 @@ namespace FloatingHealthbars
     public class HealthbarCore : MonoBehaviour
     {
         public Object healthbarUIPrefab;
+        public Object dmgNumberUIPrefab;
+
         private static ManualLogSource logger = BepInEx.Logging.Logger.CreateLogSource("HealthbarCore");
 
         public void Start()
@@ -53,16 +55,21 @@ namespace FloatingHealthbars
             // Load healthbar assets.
             string filepath = BepInEx.Paths.PluginPath + "/fhbars/" + "floatinghealthbars";
             var bundle = AssetBundle.LoadFromFile(filepath);
-            healthbarUIPrefab = bundle.LoadAsset("Assets/Mypresets/Canvas.prefab");
+            healthbarUIPrefab = bundle.LoadAsset("Assets/FloatingHealthbars/HealthbarCanvas.prefab");
+            dmgNumberUIPrefab = bundle.LoadAsset("Assets/FloatingHealthbars/Dmg.prefab");
         }
 
         private void HandleNewSpawn(BotOwner owner)
         {
             logger.LogInfo("New spawn.");
+
             var healthbar = Instantiate(healthbarUIPrefab) as GameObject;
             var tracker = healthbar.AddComponent<HealthbarTracker>();
+            var dmgInfo = Instantiate(dmgNumberUIPrefab) as GameObject;
+
             tracker.owner = owner;
             tracker.healthbar = healthbar;
+            tracker.dmgInfo = dmgInfo;
         }
     }
 
@@ -80,6 +87,10 @@ namespace FloatingHealthbars
 
         private Image healthbarImage;
         private TextMeshPro textComponent;
+
+        public GameObject dmgInfo;
+
+        private float _previousDamageCache = -1;
 
         private static float NormalizeHealth(float min, float max, float curr) => (curr - min) / (max - min) * 1;
 
@@ -109,11 +120,24 @@ namespace FloatingHealthbars
                 return;
             }
 
+            if (_previousDamageCache < 0)
+            {
+                _previousDamageCache = CurrentHealth();
+            }
+
             // Update healthbar info.
             healthbar.transform.LookAt(LocalPlayerSingleton().Transform.position);
             healthbar.transform.position = new Vector3(this.owner.Transform.position.x, this.owner.Transform.position.y + offset, this.owner.Transform.position.z);
             healthbarImage.fillAmount = NormalizeHealth(0, maxHealth, CurrentHealth());
             // textComponent.text = Convert.ToInt32(CurrentHealth()).ToString();
+
+            // Play damage anim if bot was damaged.
+            // if (CurrentHealth() < _previousDamageCache && CurrentHealth() > 1 && !owner.IsDead)
+            // {
+            //     try { dmgInfo.GetComponentInChildren<TextMeshPro>().text = (_previousDamageCache - CurrentHealth()).ToString(); } catch { logger.LogError("Can't get TMP.");  }
+            //     try { dmgInfo.GetComponentInChildren<Animation>().Play(); } catch { logger.LogError("Can't play anim.");  }
+            //     _previousDamageCache = CurrentHealth();
+            // }
             
             // Bot died.
             if (CurrentHealth() < 1 || owner.IsDead)
